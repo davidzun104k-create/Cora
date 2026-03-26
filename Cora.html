@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corazón Ama</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #heartCanvas {
+            z-index: 2;
+        }
+
+        #particlesCanvas {
+            z-index: 1;
+        }
+
+        .title {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            z-index: 3;
+            pointer-events: none;
+            font-family: monospace;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="heartCanvas"></canvas>
+        <canvas id="particlesCanvas"></canvas>
+        <div class="title">❤️ De mi para ti | Espero te guste :) | Algo así se ve el mío jajaj ❤️</div>
+    </div>
+
+    <script>
+        // Configuración de canvases
+        const heartCanvas = document.getElementById('heartCanvas');
+        const particlesCanvas = document.getElementById('particlesCanvas');
+        let ctxHeart, ctxParticles;
+        let width, height;
+        
+        // Partículas
+        let particles = [];
+        const PARTICLE_COUNT = 150;
+        
+        // Tiempo para animación
+        let time = 0;
+        
+        // Función paramétrica del corazón (orientación correcta - punta hacia abajo)
+        function heartFunction(t, scale = 1) {
+            // Ecuación paramétrica clásica del corazón
+            // x = 16 * sin(t)^3
+            // y = 13cos(t) - 5 cos(2t) - 2cos(3t) - cos(4t)
+            // Invertimos Y para que la punta apunte hacia abajo
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+            return { x: x * scale, y: y * scale };
+        }
+        
+        // Verificar si un punto está dentro del corazón
+        function isInsideHeart(x, y, centerX, centerY, scale) {
+            const relX = (x - centerX) / scale;
+            const relY = (y - centerY) / scale;
+            
+            let inside = false;
+            const steps = 200;
+            
+            for (let i = 0; i < steps; i++) {
+                const t1 = (i / steps) * Math.PI * 2;
+                const t2 = ((i + 1) / steps) * Math.PI * 2;
+                const p1 = heartFunction(t1);
+                const p2 = heartFunction(t2);
+                
+                if (((p1.y > relY) != (p2.y > relY)) &&
+                    (relX < (p2.x - p1.x) * (relY - p1.y) / (p2.y - p1.y) + p1.x)) {
+                    inside = !inside;
+                }
+            }
+            
+            return inside;
+        }
+        
+        // Clase de partícula cuántica
+        class QuantumParticle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.originalX = x;
+                this.originalY = y;
+                
+                this.orbitRadius = Math.random() * 40 + 20;
+                this.orbitSpeed = 0.5 + Math.random() * 1.5;
+                this.orbitPhase = Math.random() * Math.PI * 2;
+                this.orbitType = Math.floor(Math.random() * 3);
+                
+                this.probabilityAmplitude = 0.3 + Math.random() * 0.7;
+                this.energyLevel = Math.floor(Math.random() * 4) + 1;
+                
+                this.size = 2 + Math.random() * 3;
+                this.alpha = 0.6 + Math.random() * 0.4;
+                
+                this.tunnelOffset = 0;
+                this.tunnelSpeed = 0.5 + Math.random();
+            }
+            
+            update(time, heartX, heartY, heartScale) {
+                let orbitX = 0, orbitY = 0;
+                
+                switch(this.orbitType) {
+                    case 0:
+                        orbitX = Math.cos(time * this.orbitSpeed + this.orbitPhase) * this.orbitRadius;
+                        orbitY = Math.sin(time * this.orbitSpeed + this.orbitPhase) * this.orbitRadius;
+                        break;
+                    case 1:
+                        orbitX = Math.cos(time * this.orbitSpeed + this.orbitPhase) * this.orbitRadius;
+                        orbitY = Math.sin(time * this.orbitSpeed * 1.5 + this.orbitPhase) * this.orbitRadius * 0.7;
+                        break;
+                    case 2:
+                        const angle = time * this.orbitSpeed + this.orbitPhase;
+                        const r = this.orbitRadius * Math.sin(2 * angle);
+                        orbitX = Math.cos(angle) * r;
+                        orbitY = Math.sin(angle) * r;
+                        break;
+                }
+                
+                this.tunnelOffset = Math.sin(time * this.tunnelSpeed * this.energyLevel) * 8;
+                
+                let targetX = this.originalX + orbitX + this.tunnelOffset * 0.3;
+                let targetY = this.originalY + orbitY + this.tunnelOffset * 0.2;
+                
+                const dx = targetX - heartX;
+                const dy = targetY - heartY;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                const maxDistance = heartScale * 30;
+                
+                if (distance > maxDistance) {
+                    targetX = heartX + (dx / distance) * maxDistance;
+                    targetY = heartY + (dy / distance) * maxDistance;
+                }
+                
+                this.x += (targetX - this.x) * 0.1;
+                this.y += (targetY - this.y) * 0.1;
+            }
+            
+            draw(ctx, time) {
+                const hue = 330 + Math.sin(time * 2 + this.energyLevel) * 15;
+                const saturation = 70 + Math.sin(time * 1.5) * 20;
+                const lightness = 60 + Math.sin(time * 2.5 + this.orbitPhase) * 20;
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                
+                const gradient = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.size * 2
+                );
+                gradient.addColorStop(0, `hsla(${hue}, ${saturation}%, ${lightness}%, ${this.alpha})`);
+                gradient.addColorStop(1, `hsla(${hue}, ${saturation}%, ${lightness}%, 0)`);
+                
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.6, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness + 20}%, 0.8)`;
+                ctx.fill();
+            }
+        }
+        
+        // Inicializar partículas
+        function initParticles(heartX, heartY, heartScale) {
+            particles = [];
+            
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                let x, y;
+                let attempts = 0;
+                let found = false;
+                
+                while (!found && attempts < 100) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const t = angle;
+                    const heartPoint = heartFunction(t, heartScale);
+                    const radiusVariation = (Math.random() * 60 + 20) * heartScale / 20;
+                    
+                    x = heartX + heartPoint.x + (Math.random() - 0.5) * radiusVariation;
+                    y = heartY + heartPoint.y + (Math.random() - 0.5) * radiusVariation;
+                    
+                    const heartDist = Math.sqrt(Math.pow(x - heartX, 2) + Math.pow(y - heartY, 2));
+                    if (heartDist < heartScale * 25) {
+                        found = true;
+                    }
+                    attempts++;
+                }
+                
+                const particle = new QuantumParticle(x, y);
+                particles.push(particle);
+            }
+        }
+        
+        // Dibujar corazón (orientación correcta)
+        function drawHeart(ctx, x, y, scale, time) {
+            ctx.clearRect(0, 0, width, height);
+            
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(scale, scale);
+            
+            const gradient = ctx.createLinearGradient(-20, -20, 20, 20);
+            const hue1 = 340 + Math.sin(time) * 10;
+            const hue2 = 350 + Math.cos(time * 0.7) * 15;
+            gradient.addColorStop(0, `hsl(${hue1}, 100%, 65%)`);
+            gradient.addColorStop(0.5, `hsl(${hue2}, 100%, 55%)`);
+            gradient.addColorStop(1, `hsl(${hue1 + 10}, 100%, 70%)`);
+            
+            ctx.beginPath();
+            let first = true;
+            
+            for (let t = 0; t <= Math.PI * 2; t += 0.05) {
+                const point = heartFunction(t);
+                if (first) {
+                    ctx.moveTo(point.x, point.y);
+                    first = false;
+                } else {
+                    ctx.lineTo(point.x, point.y);
+                }
+            }
+            ctx.closePath();
+            
+            ctx.shadowColor = 'rgba(255, 105, 180, 0.5)';
+            ctx.shadowBlur = 20;
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            ctx.strokeStyle = `hsl(${hue1 + 20}, 100%, 75%)`;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            for (let t = 0; t <= Math.PI * 2; t += 0.05) {
+                const point = heartFunction(t);
+                if (t === 0) ctx.moveTo(point.x * 0.95, point.y * 0.95);
+                else ctx.lineTo(point.x * 0.95, point.y * 0.95);
+            }
+            ctx.closePath();
+            ctx.fillStyle = `hsla(${hue1 + 20}, 100%, 75%, 0.3)`;
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // Brillos alrededor
+            ctx.save();
+            ctx.shadowBlur = 0;
+            for (let i = 0; i < 20; i++) {
+                const angle = (time * 2 + i) * 0.5;
+                const radius = scale * (18 + Math.sin(time * 3 + i) * 3);
+                const sparkX = x + Math.cos(angle) * radius;
+                const sparkY = y + Math.sin(angle) * radius;
+                
+                ctx.beginPath();
+                ctx.arc(sparkX, sparkY, 2 + Math.sin(time * 5 + i) * 1, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${340 + Math.sin(time) * 20}, 100%, 70%, 0.6)`;
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+        
+        // Dibujar campo cuántico
+        function drawQuantumField(ctx, heartX, heartY, heartScale, time) {
+            ctx.save();
+            ctx.globalAlpha = 0.3;
+            ctx.strokeStyle = `hsla(330, 100%, 70%, 0.2)`;
+            ctx.lineWidth = 1;
+            
+            for (let radius = 1; radius <= 4; radius++) {
+                const orbitRadius = heartScale * (12 + radius * 6);
+                ctx.beginPath();
+                
+                for (let angle = 0; angle <= Math.PI * 2; angle += 0.1) {
+                    const x = heartX + Math.cos(angle + time * 0.5) * orbitRadius;
+                    const y = heartY + Math.sin(angle * 1.5 + time * 0.3) * orbitRadius * 0.8;
+                    
+                    if (angle === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+            
+            for (let i = 0; i < 50; i++) {
+                const angle = (i / 50) * Math.PI * 2 + time;
+                const radius = heartScale * (15 + Math.sin(time * 2 + i) * 8);
+                const x1 = heartX + Math.cos(angle) * radius;
+                const y1 = heartY + Math.sin(angle) * radius * 0.8;
+                const x2 = heartX + Math.cos(angle + 0.3) * (radius - 10);
+                const y2 = heartY + Math.sin(angle + 0.3) * (radius - 10) * 0.8;
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+        
+        // Animación principal
+        let heartScale = 1;
+        let heartX, heartY;
+        
+        function animate() {
+            if (!width || !height) return;
+            
+            time += 0.02;
+            
+            heartScale = 0.8 + Math.sin(time * 3) * 0.03;
+            heartX = width / 2;
+            heartY = height / 2;
+            
+            particles.forEach(particle => {
+                particle.update(time, heartX, heartY, heartScale * 20);
+            });
+            
+            ctxParticles.clearRect(0, 0, width, height);
+            drawQuantumField(ctxParticles, heartX, heartY, heartScale * 20, time);
+            
+            particles.forEach(particle => {
+                particle.draw(ctxParticles, time);
+            });
+            
+            drawHeart(ctxHeart, heartX, heartY, heartScale * 20, time);
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Redimensionar
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            
+            heartCanvas.width = width;
+            heartCanvas.height = height;
+            particlesCanvas.width = width;
+            particlesCanvas.height = height;
+            
+            ctxHeart = heartCanvas.getContext('2d');
+            ctxParticles = particlesCanvas.getContext('2d');
+            
+            const heartScale = 0.8;
+            const heartX = width / 2;
+            const heartY = height / 2;
+            initParticles(heartX, heartY, heartScale * 20);
+        }
+        
+        window.addEventListener('resize', resize);
+        
+        let mouseX = null, mouseY = null;
+        
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            
+            particles.forEach(particle => {
+                const dx = particle.x - mouseX;
+                const dy = particle.y - mouseY;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                if (distance < 100) {
+                    const angle = Math.atan2(dy, dx);
+                    const force = (100 - distance) / 100 * 2;
+                    particle.x += Math.cos(angle) * force;
+                    particle.y += Math.sin(angle) * force;
+                }
+            });
+        });
+        
+        resize();
+        animate();
+        
+        heartCanvas.style.pointerEvents = 'none';
+        particlesCanvas.style.pointerEvents = 'none';
+    </script>
+</body>
+</html>
